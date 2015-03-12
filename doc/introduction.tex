@@ -1,0 +1,48 @@
+
+\chapter{Introduction}
+
+\section{Overview of \dispare}
+
+\dispare is a system for \underline{dis}crete \underline{par}allel
+\underline{e}vent simulation.  Unlike other simulation systems which
+require the user to learn a ``simulation language,'' \dispare takes
+standard C language code as input, augmented with a few
+special constructs for specifying information about events.
+
+\dispare accepts a ``specification file'' and various code files from
+the user which describe the various kinds of events and contain code
+to schedule their interactions.  From these files, \dispare builds a
+complete, commented, source-level Chare Kernel (see below) program
+capable of performing the specified simulation.  The user then compiles
+the Chare Kernel code locally, modifying it at the source level if
+desired, and executes it to perform the actual simulation.
+
+\section{About The Chare Kernel}
+
+The Chare Kernel is a machine-independent, message-passing parallel
+programming system developed under the direction of L.V. Kal\'e at the
+University of Illinois, Dept. of Computer Science.  Under the Chare
+Kernel, various ``chares'' (akin to processes), written in a C
+superset language, can execute simultaneously and send messages to one
+another, making the system a good platform for discrete parallel event
+simulation.
+
+A technical description of how \dispare is implemented on the Chare
+Kernel is found in Chapter \ref{technical}.  For specific information
+about Chare Kernel programming, the reader is referred to the {\em Chare
+Kernel Programming Language Manual}.
+
+\section{\dispare Installation}
+
+Create a directory, in some convenient location, where the \dispare
+source files can reside.  These files are never modified once installed,
+so the installer script changes the protection on them accordingly.
+
+Once the directory is created, go to the directory in which the \dispare
+files currently reside, and type {\tt INSTALL} {\em directoryname},
+where {\em directoryname} is the full pathname of the directory you just
+created. 
+
+The installer script will copy the files over and change a couple of
+lines in the builder so that it knows where to find \dispare files.
+\dispare is now ready to use.

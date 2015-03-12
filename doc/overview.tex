@@ -1,0 +1,24 @@
+\section{Overview}
+\label{overview}
+
+This section contains an overview of how \dispare works.  The users
+models his system as a {\em dependency graph} of smaller event nodes
+connected by one way communication links.  The user sends information
+between event nodes throught these links.  
+
+The terminology used when discussing this dependecy graph is as follows.
+Each node is called an {\em event}.  The
+interconnections between the events are refered to as {\em Links} or {\em
+archs in the dependency graph}.
+Each Link is a unique unidirectional interconnection between two and only two
+events.  With repect to eventA, any event that provides inputs to eventA
+is called a parent of eventA.  Any event that receives an input from
+eventA is called a child of eventA.
+
+Associated with each event is an event chare and a state chare.  The
+event chare is responsible for executing the C code the user has written
+for the event.  The state chare is responsible for receiving the inputs
+from other events, keeping track of the state of the event, and
+initiating execution of the user's event code in the event chare.
+
+

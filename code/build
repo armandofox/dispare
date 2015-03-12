@@ -1,0 +1,80 @@
+#!/bin/csh -f
+#  Main builder file for the DisPare simulator - AF
+#
+#  Given the user files xxx.spc  and x1.evt ...  xn.evt, this script
+#  will first build instances of the event and state chare skeleton
+#  corresponding to each of the n .evt files, and then cat these all
+#  together with an instance of the main chare skeleton and some other
+#  header files into a .p file specified as the second argument.  Note 
+#  that only the name of the .spc file need be given, since the names of
+#  the .evt files are determined by reading the declarations in the spec
+#  file.  The name of the output (.p) file to build is specified on the command#  line. 
+#
+#  Usage:  build <spcfilename> <outfilename>
+#
+
+#  The following variables should really be set somewhere more global....
+set tmpdir=/tmp/dispare
+set dispare=#DISPAREDIR#
+
+set specfile=$1.spc
+set outfile=$2.p
+
+if(-r $tmpdir == 0) mkdir $tmpdir
+set allevtnames=$tmpdir/dpallevts
+set allstatenames=$tmpdir/dpallstates
+set tmp1=$tmpdir/dptemp1
+set tmp2=$tmpdir/dptemp2
+set tmp3=$tmpdir/dptemp3
+
+# run the C preprocessor on the .spc file to strip comments, #include, etc.
+cp $specfile $tmp2.c
+cc -E $tmp2.c > $tmp1
+rm $tmp2.c
+
+# extract the names of all the state structures
+grep STATE $tmp1 | \
+sed 's/.*STATE *//' | \
+sed 's/;//'  \
+> $allstatenames
+
+#  Extract the names of all the event types.
+grep EVENT $tmp1 | \
+sed 's/.*EVENT *//' | \
+sed 's/;//' | \
+sed    's/(/ /g' | sed 's/).*:/ /g' | sed 's/,/ /g' \
+> $allevtnames
+
+#  For each event name, create a file containing all its inputstruct names
+#  Then instantiate a state chare skeleton for it
+set nevts=`awk 'END { print NR }' $allevtnames`
+foreach evt (`awk '{ print $1 }' $allevtnames`) 
+	grep -w $evt $allevtnames > $tmp3
+	# create file containing the structure tag types for this event
+	awk '{ for (i=2; i<=NF-1; i+=2) { print $i " I"i-1";" } }' $tmp3 \
+	> $tmpdir/$evt.inp
+	# create file containing formal parameter names for this event
+	awk '{ for (i=3; i<=NF-1; i+=2) {print $i} }' $tmp3 > $tmpdir/$evt.fpa
+	xstate 	$dispare/state.p.skel \
+		$dispare/statemsg.p.skel \
+		$evt \
+		`awk '{print $NF}' $tmp3` \
+		`awk 'END {print NR}' $tmpdir/$evt.inp` \
+		$nevts \
+		$tmpdir/$evt.inp
+	xevent	$dispare/event.p.skel \
+		$allevtnames  \
+		$evt  \
+		$evt.evt  \
+		$tmpdir/$evt.fpa  \
+		$tmpdir/$evt.inp  
+end
+
+# Instantiate the main chare skeleton
+xmain $dispare/main.p.skel $allevtnames $nevts
+
+# Cat all the files together 
+cat $dispare/sim.h Main.p *_Msgs.p *_Event.p *_State.p utils.p \
+>$outfile
+
+

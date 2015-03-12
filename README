@@ -1,0 +1,17 @@
+This directory contains the code files and documentation for DisPare,
+the discrete parallel event simulator system.  DisPare was implemented
+by Armando Fox, Jack Choquette and George Shores as a term project for
+ECE/CS433, Theory of High Performance Parallel Computation.
+
+* Install the Chare Kernel on your machine.  You may have to modify the
+  Makefile in the code subdirectory to match your Chare Kernel
+  installation; in particular, be sure to set the queueing and
+  allocation strategies and directories for the Chare Kernel executables.
+
+* The LaTeX source (and figures) for the user's manual is in the doc
+  subdirectory.  "latex manual" to make the dvi file.  For the
+  impatient, the chapter "introduction.tex" contains instructions for
+  installing and using DisPare.
+
+Armando Fox 
+May 6 1991

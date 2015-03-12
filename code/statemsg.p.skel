@@ -1,0 +1,37 @@
+/*  Message types corresponding to state chare for #EVENT# events */
+
+typedef union  {
+/*  #INPUTSTRUCTS# */
+} #EVENT#_inputs;
+
+/* Schedule (enqueue) a new #EVENT# event */
+
+message {
+  #EVENT#_inputs input;
+  int sched_timestep;    /* time for which event is scheduled */
+  int which_input;       /* 0 <= which_input < #NUMINPUTS# */
+  int sequence;	
+} #EVENT#_New_Msg;
+
+/* initialization of state chare */
+
+message {
+  #STATESTRUCT# InitState;
+  int StateNum;                   /* my state index */
+  int stopTime;			/* simulation limit */
+} #EVENT#_Init_Msg;
+
+/*  Fire a new #EVENT# event */
+
+message {
+/*  #INPUTSTRUCTS# */
+  #STATESTRUCT# State;
+  int sched_timestep;
+} #EVENT#_Create_Msg;
+
+/* event completion and state update */
+
+message {
+  #STATESTRUCT# State;
+} #EVENT#_Ret_State_Msg;
+

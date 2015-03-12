@@ -1,0 +1,49 @@
+\chapter{Builder Bugs and Warnings}
+\label{syntax}
+
+The following limitations are a result of the prototype-level
+builder, and should go away once it is refined.
+
+\begin{enumerate}
+
+\item The {\tt dispare} variable in the build script must be correctly
+set to point to the directory where \dispare files are.  This directory
+should also be on the default search path.  The build script should be
+run from the directory where the user's files are.
+
+\item The user's specification file cannot contain any {\tt typedef
+struct} declarations other than those for the input and state
+structures.  Structures may be nested inside the input and state
+structures, but the nested structures may not have a tag associated with
+them. 
+
+\item EVENT, INPUT, STATE and SCHEDULE are reserved words; the user may
+not declare local or structure variables with these names.
+
+\item In the {\tt .spc} files, the reserved words EVENT, INPUT and STATE
+must appear on the {\em same line} as the identifier that follows them
+(the structure tag).
+
+\item Similarly, in the {\tt .evt} code files, the reserved word
+SCHEDULE must appear on the same line as the event scheduling call.
+
+\item No parenthesized items may appear as arguments to the event
+scheduling call.  Simple expressions without parentheses, e.g. {\tt
+TIME+delta-1}, are okay; but to be perfectly safe, use only identifiers.
+
+\item Event names as declared by the user are reserved.  That is, if the
+user declares an event named Foo1, no local variable or field within
+another structure named Foo1 may exist, or the builder will get
+{\em really} confused.
+
+\item The event prototypes must follow the input and state structure
+declarations.
+
+\item Perhaps the worst limitation: there is literally no error checking
+in the builder.  This is because the builder is implemented as a
+series of shell scripts, so errors in the user file will simply result
+in compile-time syntax errors or (in rare cases) compilable code that
+doesn't execute as expected.
+\end{enumerate}
+
+

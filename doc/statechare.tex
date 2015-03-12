@@ -1,0 +1,140 @@
+\section{State Chare}
+
+The state chare for an event type is responsible for firing instances of
+that event, passing it the correct state, inputs and timestep, and
+updating the event state when an instance finishes.  There is a single
+state chare instance for each event type.  All message scheduling is
+done through the state chare.
+
+For the purposes of this explanation, a {\em parent} event schedules a
+{\em child} event (the event types may be the same or different), and
+provides one input to that event.  An {\em event-scheduling message}
+contains the value of the input provided by the parent, the timestep
+$T_S$ at which the child event is scheduled to be executed, and an index
+$i$ indicating which parent (event type) created the event.
+
+\subsection{Functional Overview}
+
+Associated with each Event Chare is a State Chare.  The State Chare
+receives the inputs that are intended for its corresponding Event, and
+initiates the execution of the Event Chare.  For checkpointing purposes
+it also keeps a history of the STATE of the Event and of the inputs
+received.  The figure \ref{figStateEvent}  shows the message
+interconnections of the State Chare and Event Chare.
+
+\begin{figure}
+\label{figStateEvent}
+\centerline{\psfig{figure=fig_state_event.ps}}
+\caption{State and Event Chare Message Interaction}
+\end{figure}
+
+\subsection{No Checkpointing Implementation}
+
+Our test case (see chapter \ref{example}) implements a basic parallel
+event simulator without checkpointing.  To eliminate the need for
+checkpointing the Events are restricted to synchronous inputs and
+message ordering is enforced for input messages.
+
+To insure that the input messages sent by the Event Chare are processed
+by the State Chare in the same order they were created, a sequence
+counter is used.  Augmented with each input message is a sequence
+counter.  For every input message that the Event Chare sends,
+the counter is incremented by one.  The State chare uses the sequence
+counter in the message to insures that each input is processed in the same
+order that they were created by the Event Chare, even if the messages are
+received out of order, as can happen in message passing systems.
+
+This enforcement of message ordering along with the restricted of
+synchronous only Events eliminates speculative execution and the need
+for checkpointing in our test case.  Speculative work would occur when an Event
+will execute even though messages have not been received for all of
+its inputs.  If those input messages never show up, then the execution
+will be useful.  If those input messages do show up, then the
+execution is invalid and the Event needs to revert back to a previous
+state by checkpointing.  If an
+Event is restricted to synchronous inputs, it will wait until it
+receives messages for all its input before it executes.
+
+The only additional need for checkpointing is if an Event receives a revert
+message from a parent Event.  This can occur if the Event receives an input
+message from a parent, executes it, and then is told to disregard the
+input message by that same parent.  The only way this can occur
+is if the parent needed to revert to a previous state (and undo all the
+input messages to its children).  It becomes obvious that someone
+needs to initiate the revert sequence; the only thing that can do so
+is reverting due to speculative execution.
+
+\subsection{Initialization}
+
+The state chare has two initialization entry points; let us refer to
+them as Init 1 and Init 2.
+Initially, an instance of each state chare is created by the main chare
+(see section \ref{overview}).  The Init 1 entry point in each
+state chare sends its chare ID back to the main chare;  the main chare
+constructs an array containing the chare ID's off {\em all} the state
+chares.  Then, this array is sent to the Init 2 entry point in each
+state chare.  The Init 2 entry point creates the single event chare
+instance and passes it this array, and then schedules the first event at
+time 0.  The Init 1 entry point is also used to receive information
+concerning when the simulation should stop.
+
+The reason for all this communication is that since each event can
+potentially try to schedule other events of {\em any} type (not just its
+own), it needs to know the chare ID's of all the state chares so it can
+schedule all event types.
+
+\subsection{New Event Scheduling}
+
+An event-creation statement in the user's code (see chapter \ref{input})
+is translated into a Chare Kernel {\tt SendMsg} call, in which an
+event-scheduling message is sent to the state chare.  The state chare
+maintains a queue of pending events.  Explicit message sequencing is
+used to insure that event instances are fired in the correct order; the
+queue is sorted by message sequence number, and messages are never
+processed out of sequence number order.
+
+Note that a new event cannot be fired until the last fired event of the
+same type has completed.  This is because an event instance requires
+access to the event state, and the state won't be known until a previous
+instance has finished executing and modifying the state.
+
+If this is the first scheduling request for this event (as determined by
+searching the queue for an entry whose $T_S$ matches that in the
+scheduling message), a new queue entry is created, and the input
+provided by the parent that sent the scheduling message is installed in
+the queue entry.  If a queue entry already exists with a matching
+$T_S$, then the input specified in this message is installed in the
+(previously default-valued) slot in that queue entry.  It is an error
+for two parents to try to fill the same input slot for the same instance
+of a child event; this condition is detected and reported  by \dispare.
+
+If the state chare is currently {\em idle} (no event instance of its
+type is currently executing), {\em and} if all of the inputs for the
+scheduled event have arrived, the new event is fired; otherwise nothing
+happens (i.e. the entry point terminates).  Firing an event consists of
+sending a message to the already existing event chare, containing the
+timestep, inputs, and current state associated with the event type; and
+clearing the idle flag to indicate that a scheduled event is now executing.
+
+\subsection{Event Completion}
+
+When an instance of an event chare finishes executing, it sends a
+state-update message back to its state chare (see section
+\ref{evtchare}).  At this time, the state chare replaces its notion of
+the current state of the event with the state structure contained in the
+state-update message.  If there are events in the queue, the next
+pending event is fired if all its inputs are available; if there are no
+events in the queue, or if the next queued event is still waiting for
+inputs, the idle flag is set so that event firing can occur the next
+time an input is received.
+
+\subsection{Stopping Simulation}
+
+Whenever the main chare receives a StopSim message (see Chapter
+\ref{input}), it broadcasts copies of the message to all the state
+chares.  The state chare responds by updating its notion of when the
+simulation should stop.  If the event type of this state chare has
+already reached the specified timestep, no more events are fired.  If
+all state chares behave this way, the result will be quiescence.  This
+allows a normal exit through the quiescence EP even when the user has
+used StopSim to abort the simulation.

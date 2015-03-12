@@ -1,0 +1,25 @@
+#!/bin/csh -f
+#
+#  Script to construct the main chare
+#  Usage: xmain skelfile nevents alleventsfile
+
+set mainskel=$1
+set nevents=$2
+set alleventsfile=$3
+
+cat $mainskel | \
+sed "s/#NUMEVENTS#/$nevents/g" | \
+awk    'NR <= '$nevents'  { evtname[NR] = $1 } \
+	NR > '$nevents' { print }  \
+	/#INITSTATEMSG#/ { for (i=1; i<='$nevents'; i++) { \
+		print "\t" evtname[i] "_Init_Msg *" evtname[i] "_Init;" } } \
+	/#CREATESTATE#/  { for (i=1; i<='$nevents'; i++) { \
+   print "\t" evtname[i] "_Init=(" evtname[i] "_Init_Msg *)CkAllocMsg(sizeof(" evtname[i] "_Init_Msg));"  \
+   print "\t" evtname[i] "_Init->StateNum = " i-1 ";"  \
+   print "\tCreateChare(S_" evtname[i] ",S_" evtname[i] "@INITIALIZE," evtname[i] "_Init);"  }  }  \
+	/#STATE_START_CASES#/ { for (i=1; i<='$nevents'; i++) { \
+   print "\tcase " i-1 ": ep=S_" evtname[i] "@START; break;" } } \
+	/#EPCASES#/ { for (i=1; i<='$nevents'; i++) { \
+   print "\tcase " i-1 ": ep=S_" evtname[i] "@STOP_SIM; break;" } } \
+' $alleventsfile - \
+> Main.p

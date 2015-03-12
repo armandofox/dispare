@@ -1,0 +1,12 @@
+#!/bin/csh -f
+# Installer script for DisPare
+
+# Usage: INSTALL directoryname
+# Should be run from the directory where DisPare files are initially located
+# directoryname must already exist!  
+
+cp * $1
+cat build | sed 's/#DISPAREDIR#/'$1  > $1/build
+chmod -w $1/*
+chmod -w $1
+

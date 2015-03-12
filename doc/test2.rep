@@ -1,0 +1,43 @@
+Phase A Event Report:
+=====================
+Time[1] = 11: Next_Time= 111
+Time[2] = 111: Next_Time= 211
+Time[3] = 211: Next_Time= 311
+Time[4] = 311: Next_Time= 411
+Time[5] = 411: Next_Time= 511
+Time[6] = 511: Next_Time= 611
+Time[7] = 611: Next_Time= 711
+Time[8] = 711: Next_Time= 811
+Time[9] = 811: Next_Time= 911
+Time[10] = 911: Next_Time= 1011
+
+Note: Phase B,C,D reports have the same results since they are
+occurring in parallel in simulation time.
+
+Final Report:
+=============
+FEND Time	Imm1			Imm2
+Time[1]:   Side1[0]= 0:0	Side2[0]= 0:0
+Time[521]: Side1[1]= 1:11	Side2[1]= 1:11
+Time[522]: Side1[1]= 1:11	Side2[1]= 1:11
+Time[524]: Side1[2]= 101:111	Side2[2]= 101:111
+Time[527]: Side1[2]= 101:111	Side2[2]= 101:111
+Time[531]: Side1[3]= 201:211	Side2[3]= 201:211
+Time[536]: Side1[3]= 201:211	Side2[3]= 201:211
+Time[542]: Side1[4]= 301:311	Side2[4]= 301:311
+Time[549]: Side1[4]= 301:311	Side2[4]= 301:311
+Time[557]: Side1[5]= 401:411	Side2[5]= 401:411
+Time[566]: Side1[5]= 401:411	Side2[5]= 401:411
+Time[621]: Side1[6]= 501:511	Side2[6]= 501:511
+Time[622]: Side1[6]= 501:511	Side2[6]= 501:511
+Time[624]: Side1[2]= 101:111	Side2[2]= 101:111
+Time[627]: Side1[2]= 101:111	Side2[2]= 101:111
+Time[631]: Side1[3]= 201:211	Side2[3]= 201:211
+Time[636]: Side1[3]= 201:211	Side2[3]= 201:211
+Time[642]: Side1[4]= 301:311	Side2[4]= 301:311
+Time[649]: Side1[4]= 301:311	Side2[4]= 301:311
+Time[657]: Side1[5]= 401:411	Side2[5]= 401:411
+Time[666]: Side1[5]= 401:411	Side2[5]= 401:411
+
+Side1[Obj.#] = Creation_time : Entry Time into Intermediate-1 Events
+Side2[Obj.#] = Creation_time : Entry Time into Intermediate-2 Events

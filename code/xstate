@@ -1,0 +1,43 @@
+#!/bin/csh -f
+#  Shell script to generate FooEvent_State.p and FooEvent_Msgs.p - AF
+#  Usage: xstate skelfile evtname statestructname ninputs nevts inputstructs
+#	evtname: user's name for the event, e.g. FooEvent
+#	statestructname: user's tag for the state struct
+#	ninputs: number of inputs to this event type (an integer >0)
+#	nevts: the total number of user-dclared events 
+# 	inputstructs: a file containing the following:
+#		FooInput1 I1; 
+#		FooInput2 I2;  (etc.)
+
+
+
+set stateskel=$1
+set msgskel=$2
+set evtname=$3
+set statestruct=$4
+set ninputs=$5
+set nevts=$6
+set inputs=$7
+
+cat $stateskel | \
+sed     "s/#EVENT#/$evtname/g" | \
+sed	"s/#STATESTRUCT#/$statestruct/g" | \
+sed	"s/#NUMINPUTS#/$ninputs/g" | \
+sed	"s/#NUMEVENTS#/$nevts/g" | \
+awk ' { print }  \
+     /#UCASES#/ { for (i=1; i<='$ninputs'; i++) \
+	printf "\tcase %d: u->I%d = m->input.I%d; break;\n",i-1,i,i } \
+     /#CCASES#/ { for (i=1; i<='$ninputs'; i++) \
+	printf "\tc->I%d = event->inputs[%d].I%d;\n",i,i-1,i }' \
+>${evtname}_State.p
+
+cat $msgskel | \
+sed     "s/#EVENT#/$evtname/g" | \
+sed	"s/#STATESTRUCT#/$statestruct/g" | \
+sed	"/#INPUTSTRUCTS#/r $inputs"  \
+>${evtname}_Msgs.p
+
+
+
+
+	

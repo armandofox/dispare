@@ -1,0 +1,246 @@
+/**********************************************************************
+
+	State chare skeleton	AF
+
+	This skeleton has been instantiated for #EVENT#
+
+	INIT: send my chareID back to main.
+	START: do my initialization, receive ID's of all other state
+	chares, pass this on to my event chare when I create it.
+	NEW_EVENT: schedule a new #EVENT# event.
+	EVENT_DONE: a scheduled #EVENT# event has completed.
+	STOP_SIM: message containing the time at which we should stop
+
+**********************************************************************/
+
+chare S_#EVENT#  {
+
+  ChareIDType event_cid;
+  #STATESTRUCT# CurrentState;
+  int Idle;
+  int nextToSend;    /* next sequence number expected */
+  int MyStopTime;
+
+  struct #EVENT#_Q {
+    int sched_timestep;
+    int inputs_received;
+    int sequence;           /* sequence number of these inputs */ 
+    struct #EVENT#_Q *next;
+    #EVENT#_inputs inputs[#NUMINPUTS#];
+  } *HEAD_Q, *END_Q; /* linked list pointers */
+
+  /*-----------------------------------------------------------------*/
+  entry INITIALIZE: (message #EVENT#_Init_Msg *init) {
+    ChareIDType me,mainch;
+    StateCID_Msg *m;
+    int i;
+
+    /* tell the main chare what my id is */
+
+    MyChareID(&me);
+    MainChareID(&mainch);
+    if ((m=(StateCID_Msg *)CkAllocMsg(sizeof(StateCID_Msg))) == NULL)
+      FatalError("#EVENT#: CkAllocMsg failed sending Main my ChareID\n");
+    m->MyCID = me;
+    m->statenum = init->StateNum;
+    CurrentState = init->InitState;
+    MyStopTime = init->stopTime;
+    SendMsg(main@ReceiveStateCID,m,&mainch);
+    debug("#EVENT#: sent my ChareID & Index back to main\n");
+
+    /* create start and end sentinels for the history list */
+
+    if ((HEAD_Q = (struct #EVENT#_Q *)CkAlloc(sizeof(struct #EVENT#_Q)))
+	== NULL)
+      FatalError("#EVENT#: CkAlloc failed for first queue sentinel\n");
+    if ((END_Q = (struct #EVENT#_Q *)CkAlloc(sizeof(struct #EVENT#_Q)))
+	== NULL)
+      FatalError("#EVENT#: CkAlloc failed for second queue sentinel\n");
+    HEAD_Q->sched_timestep = HEAD_Q->sequence = -99;
+    END_Q->sched_timestep = HEAD_Q->sequence = SIMLIMIT;   
+        /* largest positive integer */
+    HEAD_Q->next = END_Q;
+    
+    /* set my global variables */
+
+    Idle = _TRUE;       /* indicate we're currently idle */
+    nextToSend = 0;
+  }
+
+  entry START: (message State_Start_Msg *start) {
+    int i;
+    ChareIDType me;
+    #EVENT#_New_Msg *first;
+
+    /* pass the state chare ID array along to the event chare. */
+
+    CreateChare(E_#EVENT#,E_#EVENT#@Init,start,&event_cid);
+    debug("#EVENT#: event chare created...");
+
+    /* schedule the time-zero event with the initial inputs */
+
+    MyChareID(&me);
+    for (i=0; i < #NUMINPUTS#; i++) {
+      if ((first = (#EVENT#_New_Msg *)CkAllocMsg(sizeof(#EVENT#_New_Msg)))
+	  == NULL)
+	FatalError("#EVENT#: CkAllocMsg failed for time 0 event\n");
+/*      switch(i) {*/
+/*	/* #icases# */ /* assign initial inputs */
+/*      }*/
+      first->sched_timestep = 1;
+      first->which_input = i;
+      first->sequence = 0;
+      SendMsg(S_#EVENT#@NEW_EVENT,first,&me);   /* create the initial event */
+    }
+    debug("time 0 event scheduled\n");
+  }
+  /*----------------------------------------------------------------*/
+
+  entry NEW_EVENT: (message #EVENT#_New_Msg *m) {
+    struct #EVENT#_Q *temp;
+    #EVENT#_inputs *u;
+    int which;
+
+    /* see if an entry already exists with the same sched_timestep. */
+
+    PrivateCall(#EVENT#_find(m->sched_timestep,&temp));
+    if (temp == NULL)  {  /* not found! */
+
+      /* Create new entry.  Store the info from the msg. */
+      
+      debug("#EVENT#: Creating, ts=%d, seq=%d\n",m->sched_timestep,m->sequence);
+      PrivateCall(#EVENT#_insert(&temp,m->sched_timestep));
+      temp->sched_timestep = m->sched_timestep;
+      temp->inputs_received = 1;
+      temp->sequence = m->sequence;
+    } else {    /* event exists, install new input */
+      temp->inputs_received++;
+      debug("#EVENT#: Installed input %d of #NUMINPUTS# with seq=%d\n",temp->inputs_received,m->sequence);
+    }
+      
+    /* assign the input by means of a brute-force switch on its tag. */
+
+    which = m->which_input;
+    u = &(temp->inputs[which]);
+    switch(which) { 
+      /* #UCASES# */
+      default: FatalError("#EVENT#: which_input is %d\n",which);
+	break;
+    }
+
+    /* See if we can fire the next pending event.  We know that the */
+    /* queue is not empty because we just put something in it.  We can */
+    /* fire the next queued event if:
+     *  1) there are no events pending (we are idle)
+     *  2) all inputs are present
+     *  3) all sequence numbers of inputs are next expected 
+     */
+
+    temp = HEAD_Q->next;    /* blithely reuse the variable */
+    if (Idle && temp->inputs_received == #NUMINPUTS# 
+	   && temp->sequence == nextToSend) 
+	/* it's OK to fire the event */
+	PrivateCall(#EVENT#_fire(0));
+  }
+  /*-------------------------------------------------------------------*/
+
+  entry EVENT_DONE: (message #EVENT#_Ret_State_Msg *m)  {
+    #EVENT#_Create_Msg *c;
+    int i;
+    struct #EVENT#_Q *nextevt;
+
+    debug("a #EVENT# event has finished\n");
+
+    CurrentState = m->State;
+    Idle = _TRUE;
+
+    nextevt = HEAD_Q->next;
+    if (nextevt == END_Q) {  /* no events pending, so we are done */
+      debug("#EVENT#: No events pending, sleeping\n");
+      return;
+    }
+    /* see if the next event waiting has all its inputs, and matching */
+    /* sequence numbers. */  
+
+    debug("#EVENT# event pending, its seq=%d, nexttosend=%d\n",nextevt->sequence,nextToSend);
+    if (nextevt->inputs_received == #NUMINPUTS# &&
+	nextevt->sequence == nextToSend)
+      PrivateCall(#EVENT#_fire(0));
+  }
+  /*-----------------------------------------------------------------*/
+
+  entry STOP_SIM: (message Stop_Sim_Msg *m) {
+    CkPrintf("#EVENT#: StopSim will occur at t=%d\n",m->stoptime);
+    MyStopTime = m->stoptime;
+  }
+  /*-----------------------------------------------------------------*/
+
+   /***************  fire the event at the head of the queue *************/
+
+  #EVENT#_fire(dummy) 
+    int dummy; 
+  {  /* the dummy argument appeases CK xlator */
+    #EVENT#_Create_Msg *c;
+    struct #EVENT#_Q *event;
+
+    event = HEAD_Q->next;
+    debug("#EVENT#: Firing event for seq=%d, ts=%d\n",event->sequence,event->sched_timestep);
+    if ((c = (#EVENT#_Create_Msg *)CkAllocMsg(sizeof(#EVENT#_Create_Msg)))
+	== NULL)
+      FatalError("#EVENT# state: AllocMsg failed for create message\n");
+    
+    /*  #CCASES# */ /* assign the inputs to the message fields */
+    
+    /* package the event and send it to the event chare */
+    
+    if (event->sched_timestep < MyStopTime) {
+      c->sched_timestep = event->sched_timestep;
+      c->State = CurrentState;
+      SendMsg(E_#EVENT#@Event,c,&event_cid);
+      Idle = _FALSE;
+    }
+    nextToSend++;
+    if (nextToSend == SIMLIMIT)    /* integer overflow! */
+      FatalError("#EVENT#: sequence number overflow\n");
+    HEAD_Q->next = event->next;
+    CkFree(event);                /* remove this evt from the queue */
+  }
+
+   /****************** functions to manipulate the linked list *************/
+
+  #EVENT#_insert(result,ts)   /* create new entry in sorted queue */
+    struct #EVENT#_Q **result;
+    int ts;
+  {
+    struct #EVENT#_Q *t1,*t2;
+
+    *result=(struct #EVENT#_Q *)CkAlloc(sizeof(struct #EVENT#_Q));
+    if (*result == NULL) 
+      FatalError("#EVENT# state: CkAlloc failed for queue entry\n");
+    /* link entry into queue */
+    for (t1=HEAD_Q,t2=HEAD_Q->next; t2->sched_timestep < ts; 
+	 t1=t2,t2=t2->next)
+      ;
+    (*result)->next = t2;
+    t1->next = *result;
+  }
+
+  #EVENT#_find(key,result)
+    int key;
+    struct #EVENT#_Q **result;
+  {
+    struct #EVENT#_Q *t;
+
+    *result = NULL;
+    for (t=HEAD_Q->next; t != END_Q; t=t->next)
+      if (t->sched_timestep == key) {
+	debug("#EVENT#: Found it! key=%d\n",key);
+	*result = t; break;
+      }
+  }
+}
+
+
+
+
+

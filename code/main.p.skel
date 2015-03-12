@@ -1,0 +1,119 @@
+
+
+/*********************************************************************
+
+	Main chare			JC
+
+	Entry points:
+
+	DataInit - sets up WOV array of state chare ids
+	ChareInit - creates an instance of each type of state chare
+	ReceiveStateCID - receives CID from State Chares, send start msg 
+		to all state chares.
+	ReceiveStop - receives users' message from StopSim()
+	QUIESCENCE - detects quiescence indicating end of simulation
+**********************************************************************/
+
+/* main chare sends state chare the id's of all state chares */
+
+message {
+  ChareIDType AllCID[#NUMEVENTS#];
+} State_Start_Msg;
+
+
+chare main {
+  ChareIDType   StateCID[#NUMEVENTS#];
+  int count;
+  int GlobalStopTime;
+  long SimRealTime;
+
+  entry DataInit:  {
+  }
+
+  entry ChareInit:  {
+    int i;
+    ChareIDType id;
+    /* #INITSTATEMSG# */
+
+    /* reset state chare respond count */ 
+    count = 0;
+
+    /* read simulation stop time from command line, or set it to max */
+    if (argc > 1)
+      GlobalStopTime = atoi(argv[1]);
+    else GlobalStopTime = SIMLIMIT;
+    CkPrintf("*** Simulation will stop at t=%d\n",GlobalStopTime);
+
+    /* Create all the states */
+    /* #CREATESTATE# */
+
+  }
+
+  entry ReceiveStateCID: (message StateCID_Msg *StateMSG) {
+    State_Start_Msg  *StartMsg;
+    int i, event_num;
+    EntryPointType  ep;
+
+    StateCID[StateMSG->statenum] = StateMSG->MyCID;
+	     
+    debug("Main: recieved CID from Event #%d\n", StateMSG->statenum);
+
+    count++;
+    if (count == #NUMEVENTS#)
+      {
+
+	debug("Main: Sending start msg to all state chares \n");
+	SimRealTime = (long)McTimer();
+        /* send message with StateCID to all state chares telling */
+        /*   them to start */  
+	for (event_num = 0; event_num < #NUMEVENTS#; event_num++)
+	  {
+	    StartMsg = (State_Start_Msg *)CkAllocMsg(sizeof(State_Start_Msg));
+	    /* copy StateCID into message */
+	    for (i=0; i < #NUMEVENTS#; i++) StartMsg->AllCID[i] = StateCID[i];
+	    switch (event_num)
+	      {
+		/* #STATE_START_CASES# */
+
+	        default:
+		  FatalError("Error with start msg, nonexistant event type\n");
+		  break;
+	      }   /* end of switch event_num */
+	    SendMsg(ep, StartMsg, &StateCID[event_num]);
+	  }   /* end of for event_num */ 
+      }   /* end of if count */
+  }   /* end of entry ReceiveStateCID */
+
+  entry ReceiveStop: (message Stop_Sim_Msg *s) {
+    int i;
+    Stop_Sim_Msg *m;
+    EntryPointType ep;
+
+    if (s->stoptime >= GlobalStopTime) return;
+
+    GlobalStopTime = s->stoptime;
+    for (i=0; i<#NUMEVENTS#; i++)  {
+      if ((m = (Stop_Sim_Msg *)CkAllocMsg(sizeof(Stop_Sim_Msg))) == NULL)
+	FatalError("Can't CkAlloc for StopSim message\n");
+      m->stoptime = s->stoptime;
+      switch(i) {
+	/* #EPCASES# */
+      default: FatalError("Error in StopSim msg, nonexistent event type\n");
+      }   /* end of switch (i) */
+
+      SendMsg(ep,m,&StateCID[i]);
+    }   /* end of for i */
+  }   /* end of entry ReceiveStop */
+
+  entry QUIESCENCE: 
+    {
+
+      SimRealTime -= (long)McTimer();
+      
+      CkPrintf("Simulation has completed to at least time step %d\n", 
+	       GlobalStopTime);
+      CkPrintf("Wall clock time = %.1f sec\n",(float)(-SimRealTime)/1000.0);
+      CkExit();
+    }   /* end of entry QUIESCENCE */
+}   /* end of main chare */
+    

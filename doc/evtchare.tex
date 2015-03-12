@@ -1,0 +1,77 @@
+
+\section{Event Chare}
+\label{evtchare}
+
+\subsection{The User's View}
+
+The Event Chare is the chare where the user's code for an instance of an
+Event is executed.  The user writes in ordinary C code the work that is
+initiated by its inputs for a single time step.  The variable TIME
+contains the value of this time step.  Here is an important point that
+must be stressed, once the user's code receives inputs for a cirtain
+time step, it will not receive any new inputs.  The user's code must
+finish execution and then it will be initiated with a set of inputs for
+a following time step.  If the user wishes to retain the value of any
+variable from one initiation to another, the user must store the value
+in STATE.  STATE is a structure that the user can define for each Event.
+Any value that is not stored in STATE will be lost from one initiation
+to another.
+
+An Event passes values to another Event through the use of the Link
+variables.  A Link variable is named and defined by the user.  It is a
+structure that contains all the values the users wishes to pass from one
+Event to another.  If the user wishes to pass values from EventA to
+EventB through the Link Link\_A\_B, the user would copy all the values
+into Link\_A\_B and then use the following in his/her code:
+
+{\tt SCHEDULE EventB (Link\_A\_B, $TIME + T$);}
+
+T is the relative scheduled time step that the input will be processed
+by EventB.  
+
+An Event can be one of three types: synchronous, asynchronous, or
+monitor.  {\em Synchronous} means that all input values must be
+received from all Links for a time step before the inputs can be
+processed by the Event.  {\em Asynchronous} means the input links can
+be processed for a time step even though values have not been received
+from all input Links.  The event chare will process the Event with the
+input values it has received and will use user defined defualts for
+the values of the other inputs.  A {\em monitor event} is an Event
+with no output Links.  It is used by the user to monitor the
+simulation while the simulation is running.
+
+For our simulation test case (see Chapter \ref{example}), we limited the
+Events to synchronous inputs.
+
+From the users viewpoint, this is all that needs to be known.  The
+user's view of the \dispare event simulator is a group of event nodes
+interconnected by Links.
+
+\subsection{Implementation on the Chare Kernel}
+
+Regardless of the what type of Event it is (synchronous, asynchronous,
+or monitor) the Event Chare is the same.  The Event Chare skeleton is
+shown in the appendix.
+
+The Event Chare has two entry points.  The first is an initialization
+entry point called {\tt Init}.  In the {\tt Init} entry point the
+Event Chare receives the chare IDs of all the State Chares from its
+State Chare.  It also initiallize all the variable it needs.  The
+second entry point is {\tt Event}.  The State Chare sends a messages
+to this entry point containing all the inputs for a certain time step,
+the most resent state of the Event, and the time step for the inputs.
+The Event Chare copies this information into local variables and then
+allows the user's code to run.  The user's code will then process the
+inputs for that time step.  The {\tt Event} entry point will then copy
+the new state of the Event into a message and send it to the {\tt
+EVENT\_DONE} entry point of its State Chare.
+
+At every point of the user's code where {\tt \#EVENT\_NAME\#(LINK,
+TIME+T)} appears, it is replaced with a block of send message code
+(see appendix).  This code copies the value of {\tt LINK}, {\tt TIME},
+and {\tt TIME+T} into a message and sends it to the {\tt NEW\_EVENT}
+entry point of the child Event {\tt \#EVENT\_NUM\#}.
+
+
+
+

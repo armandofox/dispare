@@ -1,0 +1,67 @@
+
+
+/*********************************************************************
+
+	Event chare			JC
+	   E_#EVENT#
+
+	Entry points:
+
+	Init - sets up StateCID vars and msg sequence counters
+	Event - executes users code for one time step
+
+**********************************************************************/
+
+chare E_#EVENT#
+{
+  ChareIDType   MyStateCID;
+  /* #CHILDCIDS# */
+  /* #MSGSEQ# */
+  entry Init: (message   State_Start_Msg  *EInitMsg)
+    {
+
+      debug("Initializing Event Chare #EVENT#\n");
+      /* init the my State CID */
+      MyStateCID = EInitMsg->AllCID[#MYINDEX#];
+      /* init the child state CIDs */
+      /* #INITCHILDCIDS# */
+      /* #INITMSGSEQ# */
+      
+    }   /* end of entry Init */
+
+  entry Event: (message   #EVENT#_Create_Msg   *eventINPUT)
+    {
+      /* Event Chare variables declaration */
+      #STATESTRUCT#   STATE;
+      int   TIME;
+      /* #USERS_INPUTSTRUCTS# */
+
+      /* Msg to retrun updated state to state chare */
+      #EVENT#_Ret_State_Msg   *Ret_State;
+
+      /* Msg to send inputs to childs' state chare */
+      /* #NEWEVENTMSG# */
+
+      /* Copy Msg values into variables that user's code uses */
+      STATE = eventINPUT->State;
+      TIME = eventINPUT->sched_timestep;
+      /* #ASSIGN_INPUTS# */
+
+      debug("Executing Event Chare #EVENT# @ ts=%d\n", TIME);
+      /*** begin of user's event code ***/
+
+      /* #USERS_CODE# */
+
+      /*** end of user's event code ***/
+
+      /* return updated State to state chare */
+      Ret_State = (#EVENT#_Ret_State_Msg *)
+	CkAllocMsg(sizeof(#EVENT#_Ret_State_Msg));
+      Ret_State->State = STATE;
+      SendMsg(S_#EVENT#@EVENT_DONE, Ret_State, &MyStateCID);
+
+    }   /* end of entry Event */
+
+}   /* end of Event Chare E_#EVENT# */
+
+

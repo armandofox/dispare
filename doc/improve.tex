@@ -1,0 +1,48 @@
+\section{Possible Improvements}
+\label{improvements}
+
+This section discusses possible improvements, both in the implementation
+of \dispare and the Chare Kernel.
+
+One possible improvement would be for the Chare Kernel to allow for
+execution of the {\tt Event} entry point to sleep (stall) untill it
+receives a response to a message.  (This would be used whenever the
+Event Chare sent a NEW\_EVENT message to a child State Chare.)
+Currently we can't do this since all the Chare Kernel calls are
+non-blocking, i.e.  there is no receive primitive.  Another way to do
+this is to allow a command that would stop execution of an entry point
+and allow the chare to receive new input messages.  A ``return'' message
+to the entry point would then allow execution to continue where it left off.
+We feel this option would greatly improve the flexibility of the Chare
+Kernel.  Right now the only way to receive new message information is at
+the beginning of a C code block; but often there is a need to stop
+and wait for additional message information when deep inside a code
+block, and jumping into another entry point would be inconvenient.
+
+This response message would be used by \dispare to insures that to many
+inputs are not queued.  If a State Chare has too many input messages
+from a parent Event and its input queue is full, it will not
+respond to the parent Event.  The parent Event sleeps and allows other
+Events to be processed until it receives the respond message.  This
+helps make sure that input queues do not become excessively large with
+inputs to be processed.  It also helps keep one Event type from monopolizing
+processing time and distributes processing time among Events.  For
+example, if an Event has a loop with many iterations, it can continually
+generate input messages for other Events while monopolizing a
+processor and not allow those other Events to process the inputs.
+This can become a major problem if the dependency graph has a lot of
+Event nodes and the simulation is being run on a machine with a very
+small number of processors.
+
+Another useful addition to the Chare Kernel would be the ability to
+kill a Chare message execution before and/or while it is being
+executed by an entry point.  Once the State Chare fires an Event, it
+may receive a message that causes it to revert.  At that point is know
+that any the work Event Chare is useless.  Killing execution of the
+message sent to the Event Chare, or even killing it before execution
+starts, would help increase efficiency.  This is especilly true if the
+Event Chare has a very long execution time.  Eliminating any input
+messages produced by the Event Chare would still be handled by sending a
+revert message.
+
+

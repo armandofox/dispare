@@ -1,0 +1,168 @@
+\section{State Chare With Checkpointing Strategy}
+
+
+If speculative execution is allowed, then checkpointing needs to be
+done.  Our checkpointing design of \dispare uses the same Event Chare
+used for our test case, only the State is different.  Although our
+checkpointing State Chare design is much more complicated, it only
+requires two more inter-chare messages, {\em Revert} and {\em State GTS}
+(see figure \ref{figstatestate}).  If a State Chare discovers that it
+should not have performed some speculative work, it uses the Revert
+message to tell its children to ignore the input messages sent.  The
+State GTS message is used to determine the {\em Event's global time step
+(GTS)}.  It uses the GTS to determine the states and input messages that
+no longer need to be saved.
+
+\begin{figure}
+\label{figstatestate}
+\centerline{\psfig{figure=fig_state_state.ps}}
+\caption{State Chare to State Chare Communication for Checkpointing}
+\end{figure}
+
+The Revert and Event GTS messages from one Event's State Chare to
+another's must also be ordered, but the ordering
+cannot be done independently.  The checkpointing messages must be
+ordered with respect to the input messages and each other so that
+checkpointing is applied to the correct input messages and states.
+
+This is where our checkpointing design fails using the Chare
+Kernal.  The Revert message would be sent by the State Chare to a
+child State Chare.  It would then start execution of a new Event
+Chare.  We had assumed that any input messages the Event Chare sent to
+the child State Chare would reach the State Chare after the Revert
+message and hense be processed after the Revert message.  Message
+ordering would therefor be preserved.  Our assumption was based on the
+fact that the Revert message travels directly from the State Chare to
+the child State Chare while the input message is dependent on a chain
+of messages, a State Chare to Event Chare message and then and Event
+Chare to child State Chare message.  We assumed that the worst case
+senario is when the input message chain of events would travel the
+same distance on the underlying architecture as the revert message
+did.  Since the message dependency flow of the input message is
+initiated after the revert message, the revert message would get to
+the child State Chare first (and be processed first).  Note that we
+also assumed that Revert and Event GTS messages would be processed by
+a child State Chare in the same order that they were created because
+they originated from the same State Chare.
+
+After many hours of work on our checkpointing design, we discovered
+that this assumption was false.  To overcome this problem our design
+requires another layer of message buffering that would enforce message
+ordering of the messages the State Chare received.  Message ordering
+needs to be enforced for different messages across multiple entry
+points with the messages coming from both the parent Event's State and
+Event Chares.  But the messages from the State and Event Chares of
+different parents need to be ordered independently of each other.
+
+Our design, assuming that this extra layer of message buffering is
+implemented, is now described in detail.
+
+\subsection{Input History}
+
+The input values received by the State Chare are stored in the Input
+History list, a linked list that grows and shrinks as needed.  This
+list is used to keep a history of the input values received.  Its
+format is shown in figure \ref{figinhis}.
+
+\begin{figure}
+\label{figinhis}
+\centerline{\psfig{figure=fig_input_his.ps}}
+\caption{Input History List}
+\end{figure}
+
+Current is a pointer that points to the top of the list of inputs that
+have yet to be processed by the Event Chare.  When the State Chare
+receives a new input from parent N, it inserts the input with the
+parent number, parent's time step and the input's time step into the
+list.  Current is updated if needed so that the new input is included
+in the list of inputs to be processed.
+
+Input values are deleted from the list if their time step is less than
+the Event's global time step.  The calculation of the Event's global
+time step is discussed in section \ref{globaltime}.
+
+\subsection{State History}
+
+The state history is stored in the State History array, an array of
+fixed size.  Its format is shown in figure \ref{figstatehis}.
+
+\begin{figure}
+\label{figstatehis}
+\centerline{\psfig{figure=fig_state_his.ps}}
+\caption{State History Array}
+\end{figure}
+
+The Save State field stores the state of the Event after the Event
+Chare has processed the inputs for the time step indicated in the Time
+Step field.  Begin and End are pointers that define the range of valid
+saved states in the array.  The save states are organized in order of
+their time step with the youngest being at Begin and the oldest at
+End.  Whenever the Event Chare finishes processing for time step T,
+the Event's state is saved by adding it to the State History array.
+
+Saved states are removed in two ways.  Any saved states with time
+steps less then the Event's global time step is removed from the array
+by updating Begin.  If a revert message or an input message is
+received with a time step less than the time step at End, all saved
+states with time steps greater than the revert's or input's time step
+are deleted by updating End.
+
+\subsection{Initiating Event Chare Processing}
+
+Whenever an Event is ready for firing, the State chare uses the inputs,
+with time step T, indicated by the Current pointer.  The State
+Chare takes all the inputs on the Input History list with time step T,
+takes the state that End points to on the State History, and sends
+this along with T and any default input values needed to the Event
+Chare.  If the State History array is full, the send is stalled until
+some states are removed.  If the Event is asynchronous, the send is
+stalled until all inputs fro the time step T have arraived.  For a
+monitor Event, the send is stalled until the Event's global time step
+equals T.  After the send, the Current pointer is updated.
+
+\subsection{Reverting to Previous States}
+
+If the State Chare receives an input with time step T that causes the
+Current pointer to point to an older time step, then the State Chare
+must revert its state to that earlier time step.  It does this by
+removing all states from its state history with time steps $\geq$ T.  The
+State Chare must also tell all its children that inputs received from
+its Event are invalid for the Event's time steps $\geq$ T.  To do this the
+State Chare sends a revert message of T to the State Chares of all of
+the Event's children.
+
+When a State Chare receives a revert message for time step R from a
+parent chare N, it will eliminate all inputs from N with a source
+Event's time step $\geq$ R.
+
+If an input is eliminated with a time step T that is less then the
+Current's time step then the State Chare must revert its state to that
+earlier time step.  Current will be updated to include all inputs with
+time steps $\geq$ T and all states with time steps $\geq$ T will be removed
+from the state history.  Then the State Chare will send a revert
+message with time T to the State Chares of all of the Event's children.
+
+\subsection{The Event's Global Time Step}
+\label{globaltime}
+
+Associated with each Event is an Event's {\em global time step}, {\em
+GTS}.  The global time step is used to remove unneeded checkpointed
+values in the input and state histories.  The Event will receive no
+new inputs values from any parent Event for a time step $\leq$ GTS and it
+will produce no new input values to any child Event for a time step $\leq
+GTS+1$.  The Event's GTS is calculated as follows:
+
+$GTS = min (min(GTS_i + 1), ((Event's Active Time Step)-1))$
+
+where $i$ is the entire set of parents for that Event.  The Event's GTS
+is calculated from the minimum of the GTSs of all the Parent Events
+and from the the time step that the Event is currently processing.  If
+the Event is not processing any inputs and has no inputs to process,
+its active time step is effectively infinite and is treated as such.
+
+The State Chare will update its GTS whenever it receives a new GTS
+from a parent or whenever its active state time step changes.  If this
+GTS update results in a new GTS value, the State Chare sends its
+$GTS+1$ to the State Chare of all its children.  It will also remove
+any uneeded inputs and states from the input and state histories.
+
